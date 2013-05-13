@@ -234,7 +234,9 @@
         var counts = {};
         var today = new Date();
        
-        var averages = [];
+        var processed_data = [];
+        var max_count = 0;
+        var max_age = 0;
        
         for ( var day in found_items ) {
             if ( found_items.hasOwnProperty(day) ) {
@@ -249,36 +251,44 @@
                 var age = null;
                 if ( items.length > 0 ) {
                     age = Math.round( age_total / items.length );
+                    if ( age > max_age ) { max_age = age; }
                 }
-                averages.push({ day: day, age: age });
+                
+                if (items.length > max_count ) { max_count = items.length };
+                processed_data.push({ day: day, age: age, count: items.length });
             }
         }
         
-        this._makeChart(averages);
+        this._makeChart(processed_data,max_age,max_count);
     },
-    _makeChart: function(averages) {
-        this._log(["_makeChart",averages]);
+    _makeChart: function(processed_data,max_age,max_count) {
+        this._log(["_makeChart",processed_data]);
         this._hideMask();
         
         var me = this;
         
         var store = Ext.create('Ext.data.Store',{
             fields: ['day','age'],
-            data: { rows: averages },
+            data: { rows: processed_data },
             proxy: { type: 'memory', reader: { type: 'json', root: 'rows' } } 
         });
         
         if ( this.chart ) { this.chart.destroy(); }
         this.chart = Ext.create('Rally.ui.chart.Chart',{
             height: 400,
-            series: [{ type: 'column', dataIndex: 'age', name: 'Average Age on Date', visible: true }],
+            series: [
+                { type: 'column', dataIndex: 'age', name: 'Average Age of Unresolved Items on Date', yAxis: 0, visible: true },
+                { type: 'line', dataIndex: 'count', name: 'Number of Unresolved Items on Date', yAxis: 1, visible: true } ],
             store: store,
             chartConfig: {
-                chart: {},
+                chart: { zoomType: 'y' },
                 title: { text: "Average Age of Unresolved Items" },
-                yAxis: { title: { text: 'Age (days)' } },
+                yAxis: [ 
+                    { title: { text: 'Age (days)' }, max: max_age },
+                    { title: { text: 'Count' }, opposite: true, min: 0, max: max_count  }
+                ],
                 xAxis: { 
-                    categories: me._getSeries(averages,'day')
+                    categories: me._getSeries(processed_data,'day')
                 }
             }
         });
