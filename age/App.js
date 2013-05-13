@@ -37,6 +37,7 @@
             storeConfig: { 
                 autoLoad: true,
                 typeAhead: true,
+                limit: 'Infinity',
                 model: 'Tag', 
                 sorters: [{property:'Name'}]
             },
