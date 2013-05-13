@@ -9,7 +9,7 @@
  Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    version: 0.1,
+    version: 0.2,
     items: [ 
         { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
         { xtype:'container', itemId:'chart_box', margin: 5 }
@@ -142,7 +142,12 @@
         unit_name = "month";
        }
        if ( unit == "Quarterly" ) {
-        today = new Date(today.getFullYear(),today.getMonth(), 1 );
+        // to get the end of a quarter, go the the first day of the next quarter
+        // then go back a day (because it's harder to guess whether a month will end on 30 or 31)
+        // So the first day of this quarter is :
+        var beginning_of_quarter = new Date( today.getFullYear(), Math.floor( today.getMonth() / 3 ) * 3, 1 );
+        
+        today = beginning_of_quarter;
         unit_name = "month";
         count_override = 3;
        }
@@ -155,7 +160,12 @@
        
        var day = Rally.util.DateTime.add(today,unit_name,-1*multiplier);
        while ( day <= today ) {
-        date_array.push( Rally.util.DateTime.toIsoString(day) );
+        var date_to_push = day;
+        if ( unit == "Quarterly" ) {
+            // Go back a day because we don't have this quarter's info yet:
+            date_to_push = Rally.util.DateTime.add(day,"day",-1);
+        }
+        date_array.push( Rally.util.DateTime.toIsoString(date_to_push) );
         day = Rally.util.DateTime.add(day,unit_name,count_override);
        }
        this._log(date_array);
