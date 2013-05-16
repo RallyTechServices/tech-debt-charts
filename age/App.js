@@ -1,5 +1,6 @@
 /*
- * 
+ *  (c) 2013 Rally Software Development Corp.  All Rights Reserved.
+ *  
  *  Notes:  
  *       1. This app will first get the items that _currently have the tag__ and then goes to look for
  *       history.  This means that you can add a tag to something today to see its state yesterday.  It
