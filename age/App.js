@@ -10,7 +10,7 @@
  Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    version: 0.2,
+    version: 0.3,
     items: [ 
         { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
         { xtype:'container', itemId:'chart_box', margin: 5 }
@@ -49,10 +49,10 @@
             labelWidth: 25,
             listeners: {
                 select: function(picker,values){
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 ready: function(picker) {
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 scope: this
             }
@@ -80,16 +80,16 @@
             labelWidth: 30,
             listeners: {
                 select: function(picker,values){
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 ready: function(picker) {
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 scope: this
             }
         });
     },
-    _findItems: function() {
+    _doTaggedStoryQuery: function() {
         if ( ! this.down('#tags') || ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
             return;
         }
@@ -108,13 +108,13 @@
             listeners: {
                 load: function(store,data,success){
                     items = data;
-                    this._findDefects(tag_name,items);
+                    this._doTaggedDefectQuery(tag_name,items);
                 },
                 scope: this
             }
         });
     },
-    _findDefects: function(tag_name,items){
+    _doTaggedDefectQuery: function(tag_name,items){
         this._showMask("Finding Defects with tag " + tag_name);
         Ext.create('Rally.data.WsapiDataStore',{
             model: 'Defect',
@@ -170,6 +170,7 @@
         date_array.push( Rally.util.DateTime.toIsoString(date_to_push) );
         day = Rally.util.DateTime.add(day,unit_name,count_override);
        }
+       date_array.push( Rally.util.DateTime.toIsoString( new Date() ));
        this._log(date_array);
        return date_array;
     },
@@ -256,9 +257,14 @@
                 }
                 
                 if (items.length > max_count ) { max_count = items.length };
-                processed_data.push({ day: day, age: age, count: items.length });
+                processed_data.push({ day: day, age: age, count: items.length, final_day_age: null, final_day_count: null });
             }
         }
+        
+        // move last day's data over to the right
+        var last_age = processed_data[ processed_data.length - 1 ].age;
+        processed_data[processed_data.length-1].final_day_age = last_age;
+        processed_data[processed_data.length-1].age = null;
         
         this._makeChart(processed_data,max_age,max_count);
     },
@@ -279,6 +285,7 @@
             height: 400,
             series: [
                 { type: 'column', dataIndex: 'age', name: 'Average Age of Unresolved Items on Date', yAxis: 0, visible: true },
+                { type: 'column', dataIndex: 'final_day_age', name: 'Average Age of Unresolved Items Today', yAxis: 0, visible: true },
                 { type: 'line', dataIndex: 'count', name: 'Number of Unresolved Items on Date', yAxis: 1, visible: true } ],
             store: store,
             chartConfig: {
