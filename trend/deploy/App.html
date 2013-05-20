@@ -345,12 +345,12 @@
                     this._showMask("Processing Cumulative Items");
                     this._log(["Processing",found_items]);
                     var me = this;
-                    var values = {};
                     var today = new Date();
+            
+                    var values = {};
                     var measure_field = this.down('#measure').getRecord().get('_lookback_name');
                             
-                    var processed_data = [];
-                   
+                    var processed_data = [];   
                     var last_resolved = 0;
                     for ( var day in found_items ) {
                         if ( found_items.hasOwnProperty(day) ) {
@@ -361,7 +361,8 @@
                                 "total_released": 0,
                                 "existing_backlog": 0,
                                 "added_to_backlog": 0,
-                                "delta_resolved": 0
+                                "delta_resolved": 0,
+                                "delta_released": 0
                             };
                             
                             Ext.Array.each( items, function(item){
@@ -379,8 +380,17 @@
                                 } else {
                                     values.existing_backlog += added_value;
                                 }
+                                var release_date = artifact.get('_ReleaseDate');
+                                var start_date_js = me._getStartOfPeriod(day);
+                                var start_date = Rally.util.DateTime.toIsoString(start_date_js,false);
+                                
+                                if ( release_date && release_date <= day && release_date >= start_date ) {
+                                    values.delta_released += added_value;
+                                }
                             });
                             
+                            
+                            // what changed from the preceding timebox
                             values.delta_resolved = values.total_resolved - last_resolved;
                             if ( values.delta_resolved < 0 ) { values.delta_resolved = 0; }
                             last_resolved = values.total_resolved;
@@ -446,7 +456,7 @@
                                 { type: 'area', dataIndex: 'total_resolved', name: 'Total Resolved', visible: true },
                                 { type: 'area', dataIndex: 'added_to_backlog', name: 'New To Backlog', visible: true },
                                 { type: 'area', dataIndex: 'existing_backlog', name: 'Existing Backlog', visible: true },
-                                { type: 'line', dataIndex: 'released_in_timebox', name: 'Released', visible: true },
+                                { type: 'line', dataIndex: 'delta_released', name: 'Released', visible: true },
                                 { type: 'line', dataIndex: 'delta_resolved', name: 'Resolved', visible: true }
                             ],
                             store: store,

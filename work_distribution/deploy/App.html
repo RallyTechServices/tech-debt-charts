@@ -19,7 +19,7 @@
              Ext.define('TagDistributionApp', {
                 extend: 'Rally.app.App',
                 componentCls: 'app',
-                version: 0.1,
+                version: 0.2,
                 items: [ 
                     { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
                     { xtype:'container', itemId:'chart_box', margin: 5 }
@@ -115,15 +115,15 @@
                         listeners: {
                             select: function(picker,values){
                                 this._log("tags.select");
-                                this._findItems();
+                                this._doTaggedStoryQuery();
                             },
                             ready: function(picker) {
                                 this._log("tags.ready");
-                                this._findItems();
+                                this._doTaggedStoryQuery();
                             },
                             staterestore: function(picker) {
                                 this._log("tags.staterestore");
-                                this._findItems();
+                                this._doTaggedStoryQuery();
                             },
                             scope: this
                         }
@@ -152,15 +152,15 @@
                         listeners: {
                             select: function(picker,values){
                                 this._log("zoom.select");
-                                this._findItems();
+                                this._doTaggedStoryQuery();
                             },
                             change: function(picker) {
                                 this._log("zoom.change");
-                                this._findItems();
+                                this._doTaggedStoryQuery();
                             },
                             staterestore: function(picker) {
                                 this._log("zoom.staterestore");
-                                this._findItems();
+                                this._doTaggedStoryQuery();
                             },
                             scope: this
                         }
@@ -205,23 +205,19 @@
                                 listeners: {
                                     select: function(picker,values){
                                         me._log("measure.select");
-                                        me._findItems();
+                                        me._doTaggedStoryQuery();
                                     },
                                     change: function(picker) {
                                         me._log("measure.change");
-                                        me._findItems();
+                                        me._doTaggedStoryQuery();
                                     },
                                     staterestore: function(picker) {
                                         me._log("measure.staterestore");
-                                        me._findItems();
+                                        me._doTaggedStoryQuery();
                                     },
                                     show: function(picker) {
                                         this._log("measure.show");
-                                        this._findItems();
-                                    },
-                                    boxready: function(picker) {
-                                        me._log("measure.boxready");
-                                        me._findItems();
+                                        this._doTaggedStoryQuery();
                                     }
                                 }
                             });
@@ -230,7 +226,7 @@
             
                 },
                 /* this one responds to the project scoping */
-                _findItems: function() {
+                _doTaggedStoryQuery: function() {
                     // ALL THREE selectors must be chosen to proceed
                     if ( ! this.down('#tags') || this.down('#tags').getRecord() === false) {
                         this._log("No tags value yet");
@@ -263,13 +259,13 @@
                         listeners: {
                             load: function(store,data,success){
                                 items = data;
-                                this._findDefects(tag_name,items);
+                                this._doTaggedDefectQuery(tag_name,items);
                             },
                             scope: this
                         }
                     });
                 },
-                _findDefects: function(tag_name,items){
+                _doTaggedDefectQuery: function(tag_name,items){
                     this._showMask("Finding Defects with tag " + tag_name);
                     var measure_field = this.down('#measure').getSubmitValue();
                     
@@ -452,7 +448,7 @@
                         if ( this.chart ) { this.chart.destroy(); }
                         this.chart = Ext.create('Rally.ui.chart.Chart',{
                             height: 400,
-                            series: me._getSeries(processed_data[0]),
+                            series: me._getSeries(processed_data[ processed_data.length - 1 ]),
                             store: store,
                             chartConfig: {
                                 chart: { zoomType: 'xy' },
@@ -470,10 +466,16 @@
                     }
                 },
                 _getSeries: function(series_hash) {
+                    this._log("_getSeries");
                     var series_set = [];
                     for ( var i in series_hash ) {
                         if ( series_hash.hasOwnProperty(i) && i !== "day" ) {
-                            series_set.push({ type: 'area', dataIndex: i, name: i, visible: true, stack: 0 });
+                            var data_array = series_hash[i];
+                            if ( series_hash[i] > 0 ) {
+                                series_set.push({ type: 'area', dataIndex: i, name: i, visible: true, stack: 0 });
+                            } else {
+                                this._log( "NOTE: Skipping " + i + " because they are zero on the last day" );
+                            }
                         }
                     }
                     return series_set;
