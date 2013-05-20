@@ -55,15 +55,15 @@
             listeners: {
                 select: function(picker,values){
                     this._log("tags.select");
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 ready: function(picker) {
                     this._log("tags.ready");
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 staterestore: function(picker) {
                     this._log("tags.staterestore");
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 scope: this
             }
@@ -92,11 +92,11 @@
             listeners: {
                 change: function(picker) {
                     this._log("zoom.change");
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 staterestore: function(picker) {
                     this._log("zoom.staterestore");
-                    this._findItems();
+                    this._doTaggedStoryQuery();
                 },
                 scope: this
             }
@@ -141,15 +141,15 @@
                     listeners: {
                         change: function(picker) {
                             me._log("measure.change");
-                            me._findItems();
+                            me._doTaggedStoryQuery();
                         },
                         staterestore: function(picker) {
                             me._log("measure.staterestore");
-                            me._findItems();
+                            me._doTaggedStoryQuery();
                         },
                         show: function(picker) {
                             this._log("measure.show");
-                            this._findItems();
+                            this._doTaggedStoryQuery();
                         }
                     }
                 });
@@ -160,7 +160,7 @@
      * we're not restricted to project scoping because there are some things in a separate debt project to follow.
      * we have to get the items through wsapi first to prevent permissions issue when hitting lookback
      */
-    _findItems: function() {
+    _doTaggedStoryQuery: function() {
         // ALL THREE selectors must be chosen to proceed
         if ( ! this.down('#tags') || this.down('#tags').getRecord() === false) {
             this._log("No tags value yet");
@@ -194,13 +194,13 @@
             listeners: {
                 load: function(store,data,success){
                     items = data;
-                    this._findDefects(tag_name,items);
+                    this._doTaggedDefectQuery(tag_name,items);
                 },
                 scope: this
             }
         });
     },
-    _findDefects: function(tag_name,items){
+    _doTaggedDefectQuery: function(tag_name,items){
         this._showMask("Finding Defects with tag " + tag_name);
         var measure_field = this.down('#measure').getSubmitValue();
         
@@ -342,6 +342,7 @@
                 
         var processed_data = [];
        
+        var last_resolved = 0;
         for ( var day in found_items ) {
             if ( found_items.hasOwnProperty(day) ) {
                 var items = found_items[day];
@@ -350,7 +351,8 @@
                     "total_resolved": 0,
                     "total_released": 0,
                     "existing_backlog": 0,
-                    "added_to_backlog": 0
+                    "added_to_backlog": 0,
+                    "delta_resolved": 0
                 };
                 
                 Ext.Array.each( items, function(item){
@@ -361,17 +363,19 @@
                         added_value = item.get(measure_field) || 0;
                     }
                     var artifact = me._artifact_hash[item.get('ObjectID')];
-                    if ( artifact.get('_ReleaseDate') <= day ) {
-                        values.total_released += added_value;
-                    } else if ( item.get('ScheduleState') == "Completed" || item.get('ScheduleState') == "Accepted" ) {
+                    if ( item.get('ScheduleState') == "Completed" || item.get('ScheduleState') == "Accepted" ) {
                         values.total_resolved += added_value;
-                    } else if ( me._createdDuringTimePeriod(item,day) ) {
+                    } else if ( me._wasCreatedDuringTimePeriod(item,day) ) {
                         values.added_to_backlog += added_value;
                     } else {
                         values.existing_backlog += added_value;
                     }
                 });
                 
+                values.delta_resolved = values.total_resolved - last_resolved;
+                if ( values.delta_resolved < 0 ) { values.delta_resolved = 0; }
+                last_resolved = values.total_resolved;
+               
                 processed_data.push(values);
             }
         }
@@ -390,7 +394,7 @@
         
         return start_date_js;
     },
-    _createdDuringTimePeriod: function(item,end_date_iso) {
+    _wasCreatedDuringTimePeriod: function(item,end_date_iso) {
         var item_creation = this._artifact_hash[item.get('ObjectID')].get('CreationDate');   
         var start_date_js = this._getStartOfPeriod(end_date_iso);
         var end_date_js = Rally.util.DateTime.fromIsoString(end_date_iso);
@@ -423,17 +427,18 @@
                         type: 'json', 
                         root: 'rows' 
                     }
-                } 
+                }
             });
             
             if ( this.chart ) { this.chart.destroy(); }
             this.chart = Ext.create('Rally.ui.chart.Chart',{
                 height: 400,
                 series: [
-                    { type: 'area', dataIndex: 'total_released', name: 'Total Released', visible: true },
                     { type: 'area', dataIndex: 'total_resolved', name: 'Total Resolved', visible: true },
                     { type: 'area', dataIndex: 'added_to_backlog', name: 'New To Backlog', visible: true },
-                    { type: 'area', dataIndex: 'existing_backlog', name: 'Existing Backlog', visible: true }
+                    { type: 'area', dataIndex: 'existing_backlog', name: 'Existing Backlog', visible: true },
+                    { type: 'line', dataIndex: 'released_in_timebox', name: 'Released', visible: true },
+                    { type: 'line', dataIndex: 'delta_resolved', name: 'Resolved', visible: true }
                 ],
                 store: store,
                 chartConfig: {
