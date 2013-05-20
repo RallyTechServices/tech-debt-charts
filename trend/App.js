@@ -90,10 +90,6 @@
             fieldLabel: 'Zoom:',
             labelWidth: 30,
             listeners: {
-                select: function(picker,values){
-                    this._log("zoom.select");
-                    this._findItems();
-                },
                 change: function(picker) {
                     this._log("zoom.change");
                     this._findItems();
@@ -143,10 +139,6 @@
                     fieldLabel: 'Measure:',
                     labelWidth: 45,
                     listeners: {
-                        select: function(picker,values){
-                            me._log("measure.select");
-                            me._findItems();
-                        },
                         change: function(picker) {
                             me._log("measure.change");
                             me._findItems();
@@ -386,12 +378,9 @@
         
         this._makeChart(processed_data);
     },
-    _createdDuringTimePeriod: function(item,end_date) {
-        var item_creation = this._artifact_hash[item.get('ObjectID')].get('CreationDate');
+    _getStartOfPeriod: function(end_date_iso) {
+        var end_date_js = Rally.util.DateTime.fromIsoString(end_date_iso);
         var unit = this.down('#zoom').getRawValue();
-        // end_date comes in as ISO. Creation Date is JS
-        var end_date_js = Rally.util.DateTime.fromIsoString(end_date);
-               
         var start_date_js = Rally.util.DateTime.add(end_date_js,"year",-1);
         if ( unit == "Monthly" ) {
             start_date_js = Rally.util.DateTime.add(end_date_js,"month",-1);
@@ -399,6 +388,13 @@
             start_date_js = Rally.util.DateTime.add(end_date_js,"month",-3);
         }
         
+        return start_date_js;
+    },
+    _createdDuringTimePeriod: function(item,end_date_iso) {
+        var item_creation = this._artifact_hash[item.get('ObjectID')].get('CreationDate');   
+        var start_date_js = this._getStartOfPeriod(end_date_iso);
+        var end_date_js = Rally.util.DateTime.fromIsoString(end_date_iso);
+
         if ( item_creation > start_date_js && item_creation <= end_date_js ) {
             return true;
         }
