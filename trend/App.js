@@ -158,10 +158,6 @@
                         show: function(picker) {
                             this._log("measure.show");
                             this._findItems();
-                        },
-                        boxready: function(picker) {
-                            me._log("measure.boxready");
-                            me._findItems();
                         }
                     }
                 });
@@ -202,7 +198,7 @@
             limit: Infinity,
             context: { "project": null },
             filters: [{"property":"Tags.Name","operator":"contains","value":tag_name}],
-            fetch: ['ObjectID',measure_field,"Release","ReleaseDate"],
+            fetch: ['ObjectID',measure_field,"Release","ReleaseDate","CreationDate"],
             listeners: {
                 load: function(store,data,success){
                     items = data;
@@ -222,12 +218,12 @@
             limit: Infinity,
             context: { "project": null },
             filters: [{"property":"Tags.Name","operator":"contains","value":tag_name}],
-            fetch: ['ObjectID',measure_field,"Release","ReleaseDate"],
+            fetch: ['ObjectID',measure_field,"Release","ReleaseDate","CreationDate"],
             listeners: {
                 load: function(store,data,success){
                     items = Ext.Array.push(items,data);
                     this._setItemHash(items);
-                    this._getHistory(items);
+                    this._getCumulativeHistory(items);
                 },
                 scope: this
             }
@@ -286,8 +282,8 @@
        }
        return date_array;
     },
-    _getHistory: function(items) {
-        this._showMask("Getting Historical Data");
+    _getCumulativeHistory: function(items) {
+        this._showMask("Getting Cumulative Historical Data");
         var oid_array = [];
         Ext.Array.each( items, function(item) { oid_array.push(item.get('ObjectID')); } );
         // cycle by time period
@@ -296,14 +292,14 @@
         var date_array = this._getDateArray(date_unit,date_count);
         var current_date = date_array.shift();
         // have to break the history query because the query is a GET and the length is limited
-        this._doNestedHistoryQuery(oid_array,0,current_date,date_array,{});
+        this._doNestedCumulativeHistoryQuery(oid_array,0,current_date,date_array,{});
     },
     /* this does a double nest: cycle until we've used up the array of items to search for on a day, then start
      * over again for another day and so on until the date_array is empty
      */
-    _doNestedHistoryQuery: function(oid_array,start_index,current_date,date_array,found_items) {
-        this._showMask("Getting Historical Data " + current_date);
-        this._log(["_doNestedHistoryQuery",start_index,current_date]);
+    _doNestedCumulativeHistoryQuery: function(oid_array,start_index,current_date,date_array,found_items) {
+        this._showMask("Getting Cumulative History Data " + current_date);
+        this._log(["_doNestedCumulativeHistoryQuery",start_index,current_date]);
         var measure_field = this.down('#measure').getRecord().get('_lookback_name');
        
         var gap = 200;
@@ -312,14 +308,15 @@
         
         var filters = [
             {"property":"ObjectID","operator":"in","value":sliced_array},
-            {"property":"ScheduleState","operator":">=","value":"Completed"},
+            /* {"property":"ScheduleState","operator":">=","value":"Completed"}, */
             {"property":"__At","value":current_date}
         ];
         
         Ext.create('Rally.data.lookback.SnapshotStore',{
             autoLoad: true,
             limit: gap,
-            fetch: ['_UnformattedID',measure_field,'ObjectID'],
+            fetch: ['_UnformattedID',measure_field,'ObjectID','ScheduleState'],
+            hydrate: ['ScheduleState'],
             filters: filters,
             listeners: {
                 load: function(store,data,success){
@@ -327,14 +324,14 @@
                     
                     start_index = start_index + gap;
                     if ( start_index < oid_array.length ) {
-                        this._doNestedHistoryQuery(oid_array,start_index,current_date,date_array,found_items);
+                        this._doNestedCumulativeHistoryQuery(oid_array,start_index,current_date,date_array,found_items);
                     } else {
                         if ( date_array.length > 0 ) {
                             current_date = date_array.shift();
                             start_index = 0;
-                            this._doNestedHistoryQuery(oid_array,start_index,current_date,date_array,found_items);
+                            this._doNestedCumulativeHistoryQuery(oid_array,start_index,current_date,date_array,found_items);
                         } else {
-                            this._processItems(found_items);
+                            this._processCumulativeItems(found_items);
                         }
                     }
                 },
@@ -343,8 +340,8 @@
         });
         
     },
-    _processItems: function(found_items) {
-        this._showMask("Processing Items");
+    _processCumulativeItems: function(found_items) {
+        this._showMask("Processing Cumulative Items");
         this._log(["Processing",found_items]);
         var me = this;
         var values = {};
@@ -359,7 +356,9 @@
                 var values = { 
                     "day": day, 
                     "total_resolved": 0,
-                    "total_released": 0
+                    "total_released": 0,
+                    "existing_backlog": 0,
+                    "added_to_backlog": 0
                 };
                 
                 Ext.Array.each( items, function(item){
@@ -372,8 +371,12 @@
                     var artifact = me._artifact_hash[item.get('ObjectID')];
                     if ( artifact.get('_ReleaseDate') <= day ) {
                         values.total_released += added_value;
-                    } else {
+                    } else if ( item.get('ScheduleState') == "Completed" || item.get('ScheduleState') == "Accepted" ) {
                         values.total_resolved += added_value;
+                    } else if ( me._createdDuringTimePeriod(item,day) ) {
+                        values.added_to_backlog += added_value;
+                    } else {
+                        values.existing_backlog += added_value;
                     }
                 });
                 
@@ -382,6 +385,24 @@
         }
         
         this._makeChart(processed_data);
+    },
+    _createdDuringTimePeriod: function(item,end_date) {
+        var item_creation = this._artifact_hash[item.get('ObjectID')].get('CreationDate');
+        var unit = this.down('#zoom').getRawValue();
+        // end_date comes in as ISO. Creation Date is JS
+        var end_date_js = Rally.util.DateTime.fromIsoString(end_date);
+               
+        var start_date_js = Rally.util.DateTime.add(end_date_js,"year",-1);
+        if ( unit == "Monthly" ) {
+            start_date_js = Rally.util.DateTime.add(end_date_js,"month",-1);
+        } else if ( unit == "Quarterly" ) {
+            start_date_js = Rally.util.DateTime.add(end_date_js,"month",-3);
+        }
+        
+        if ( item_creation > start_date_js && item_creation <= end_date_js ) {
+            return true;
+        }
+        return false;
     },
     _makeChart: function(processed_data) {
         this._log(["_makeChart",processed_data]);
@@ -414,7 +435,9 @@
                 height: 400,
                 series: [
                     { type: 'area', dataIndex: 'total_released', name: 'Total Released', visible: true },
-                    { type: 'area', dataIndex: 'total_resolved', name: 'Total Resolved', visible: true }
+                    { type: 'area', dataIndex: 'total_resolved', name: 'Total Resolved', visible: true },
+                    { type: 'area', dataIndex: 'added_to_backlog', name: 'New To Backlog', visible: true },
+                    { type: 'area', dataIndex: 'existing_backlog', name: 'Existing Backlog', visible: true }
                 ],
                 store: store,
                 chartConfig: {
