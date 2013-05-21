@@ -18,7 +18,9 @@
     launch: function() {
         this._addTagPicker();
         this._addZoomPicker();
+        this._addExcludedProjectPicker();
     },
+    _excluded_projects: [],
     _log: function(msg) {
         window.console && console.log(msg);
     },
@@ -89,6 +91,34 @@
             }
         });
     },
+    _addExcludedProjectPicker: function() {
+        this.down('#selector_box').add({
+            itemId: 'excluded_projects',
+            xtype: 'rallymultiobjectpicker',
+            modelType: 'project',
+            stateEvents: ['selectionchange','select','blur'],
+            stateId: 'rally.techservices.techdebt.project',
+            stateful: true,
+            labelWidth: 95,
+            fieldLabel: 'Excluded Projects:',
+            listeners: {
+                selectionchange: function(picker, values) {
+                    this._log("selectionchange");
+                    this._excluded_projects = values;
+                },
+                change: function() {
+                    this._log("change");
+                },
+                select: function() {
+                    this._log("select");
+                },
+                blur: function() {
+                    this._doTaggedStoryQuery();
+                },
+                scope: this
+            }
+        });  
+    },
     _doTaggedStoryQuery: function() {
         if ( ! this.down('#tags') || ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
             return;
@@ -104,7 +134,7 @@
             limit: Infinity,
             context: { "project": null },
             filters: [{"property":"Tags.Name","operator":"contains","value":tag_name}],
-            fetch: ['ObjectID','ScheduleState'],
+            fetch: ['ObjectID','ScheduleState','Project'],
             listeners: {
                 load: function(store,data,success){
                     items = data;
@@ -122,7 +152,7 @@
             limit: Infinity,
             context: { "project": null },
             filters: [{"property":"Tags.Name","operator":"contains","value":tag_name}],
-            fetch: ['ObjectID','ScheduleState'],
+            fetch: ['ObjectID','ScheduleState','Project'],
             listeners: {
                 load: function(store,data,success){
                     items = Ext.Array.push(items,data);
@@ -174,9 +204,31 @@
        this._log(date_array);
        return date_array;
     },
+    _removeExcludedProjects: function(items) {
+        this._log( "_removeExcludedProjects" );
+        var me = this;
+        if ( this._excluded_projects.length === 0 ) { 
+            this._log("No excluded projects");
+            return items;
+        }
+        this._log(["Exclude: ", this._excluded_projects ]);
+        var oids = [];
+        Ext.Array.each( this._excluded_projects, function(project) {
+            oids.push(project.ObjectID);
+        });
+        var cleaned_items = [];
+        Ext.Array.each(items,function(item){
+            if ( Ext.Array.indexOf( oids, parseInt(item.get('Project').ObjectID,10) ) === -1 ) {
+                cleaned_items.push( item );
+            } 
+        });
+        return cleaned_items;
+    },
     _getHistory: function(items) {
         this._showMask("Getting Historical Data");
         var oid_array = [];
+        items = this._removeExcludedProjects(items);
+        
         Ext.Array.each( items, function(item) { oid_array.push(item.get('ObjectID')); } );
         // cycle by time period
         var date_unit = this.down('#zoom').getRawValue();

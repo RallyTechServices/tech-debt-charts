@@ -5,6 +5,9 @@
  *       1. This app will first get the items that _currently have the tag__ and then goes to look for
  *       history.  This means that you can add a tag to something today to see its state yesterday.  It
  *       also means that you don't see how designations change over time.
+ *       2. However, the measurement field is the value it was on each day sampled -- so if the PlanEstimate,
+ *       for example, was changed in March, the April value will reflect the new value, while March keeps
+ *       the old one.
  *       
  */
  Ext.define('TagTrendApp', {
