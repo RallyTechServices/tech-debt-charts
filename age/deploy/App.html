@@ -28,6 +28,7 @@
                     this._addTagPicker();
                     this._addZoomPicker();
                     this._addExcludedProjectPicker();
+                    this._addButton();
                 },
                 _excluded_projects: [],
                 _log: function(msg) {
@@ -41,6 +42,28 @@
                 },
                 _hideMask: function() {
                     this.getEl().unmask();
+                },
+                _enableButton: function() {
+                    if ( this.down('#go_button') ) {
+                        if ( ! this.down('#tags') || ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
+                            return;
+                        }
+                        this.down('#go_button').setDisabled(false);
+                    }
+                },
+                _addButton: function() {
+                    var me = this;
+                    this.down('#selector_box').add({
+                        itemId: 'go_button',
+                        xtype: 'rallybutton',
+                        text: 'Go',
+                        disabled: true,
+                        margin: 3,
+                        handler: function() {
+                            me._doTaggedStoryQuery();
+                        }
+                    }); 
+                    this._enableButton();
                 },
                 _addTagPicker: function() {
                     this.down('#selector_box').add({
@@ -60,10 +83,10 @@
                         labelWidth: 25,
                         listeners: {
                             select: function(picker,values){
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             ready: function(picker) {
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             scope: this
                         }
@@ -91,10 +114,10 @@
                         labelWidth: 30,
                         listeners: {
                             select: function(picker,values){
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             ready: function(picker) {
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             scope: this
                         }
@@ -122,16 +145,14 @@
                                 this._log("select");
                             },
                             blur: function() {
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             scope: this
                         }
                     });  
                 },
                 _doTaggedStoryQuery: function() {
-                    if ( ! this.down('#tags') || ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
-                        return;
-                    }
+            
                     var tag_name = this.down('#tags').getRecord().get('Name')
                     // first, find all the items with the tag.  Use WSAPI so that we don't have
                     // a permissions issue later.
