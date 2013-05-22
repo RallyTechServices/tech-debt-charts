@@ -134,15 +134,33 @@
                     }
                     var tag_name = this.down('#tags').getRecord().get('Name')
                     // first, find all the items with the tag.  Use WSAPI so that we don't have
-                    // a permissions issue later
+                    // a permissions issue later.
                     this._showMask("Finding Stories with tag " + tag_name);
                     var items = [];
+                    // Data before 11/2011 is unreliable, so try to remove as many
+                    // items as possible
+                    var tag_filter = Ext.create('Rally.data.QueryFilter', { 
+                        property: 'Tags.Name',
+                        operator: 'contains',
+                        value: tag_name
+                    });
+                    var not_accepted_too_early_filter = Ext.create('Rally.data.QueryFilter', { 
+                        property: 'AcceptedDate',
+                        operator: '>',
+                        value: "2011-11-01"
+                    }).or(Ext.create('Rally.data.QueryFilter', { 
+                        property: 'AcceptedDate',
+                        operator: '=',
+                        value: null
+                    }));
+                    var filters = tag_filter.and(not_accepted_too_early_filter);
+                    
                     Ext.create('Rally.data.WsapiDataStore',{
                         model: 'User Story',
                         autoLoad: true,
                         limit: Infinity,
                         context: { "project": null },
-                        filters: [{"property":"Tags.Name","operator":"contains","value":tag_name}],
+                        filters: filters,
                         fetch: ['ObjectID','ScheduleState','Project'],
                         listeners: {
                             load: function(store,data,success){
@@ -155,16 +173,33 @@
                 },
                 _doTaggedDefectQuery: function(tag_name,items){
                     this._showMask("Finding Defects with tag " + tag_name);
+                    var tag_filter = Ext.create('Rally.data.QueryFilter', { 
+                        property: 'Tags.Name',
+                        operator: 'contains',
+                        value: tag_name
+                    });
+                    var not_accepted_too_early_filter = Ext.create('Rally.data.QueryFilter', { 
+                        property: 'AcceptedDate',
+                        operator: '>',
+                        value: "2011-11-01"
+                    }).or(Ext.create('Rally.data.QueryFilter', { 
+                        property: 'AcceptedDate',
+                        operator: '=',
+                        value: null
+                    }));
+                    var filters = tag_filter.and(not_accepted_too_early_filter);
+                    
                     Ext.create('Rally.data.WsapiDataStore',{
                         model: 'Defect',
                         autoLoad: true,
                         limit: Infinity,
                         context: { "project": null },
-                        filters: [{"property":"Tags.Name","operator":"contains","value":tag_name}],
+                        filters: filters,
                         fetch: ['ObjectID','ScheduleState','Project'],
                         listeners: {
                             load: function(store,data,success){
                                 items = Ext.Array.push(items,data);
+                                this._log("Number of Tagged Items:"+items.length);
                                 this._getHistory(items);
                             },
                             scope: this
@@ -236,6 +271,7 @@
                 _getHistory: function(items) {
                     this._showMask("Getting Historical Data");
                     var oid_array = [];
+                    this.original_oids = oid_array;
                     items = this._removeExcludedProjects(items);
                     
                     Ext.Array.each( items, function(item) { oid_array.push(item.get('ObjectID')); } );
@@ -253,7 +289,7 @@
                 _doNestedHistoryQuery: function(oid_array,start_index,current_date,date_array,found_items) {
                     this._showMask("Getting Historical Data " + current_date);
                     this._log(["_doNestedHistoryQuery",start_index,current_date]);
-                    var gap = 200;
+                    var gap = 350;
                     var sliced_array = oid_array.slice(start_index, start_index+gap);
                     if ( ! found_items[current_date] ) { found_items[current_date] = []; }
                     
@@ -292,7 +328,7 @@
                 },
                 _processItems: function(found_items) {
                     this._showMask(["Calculating Ages"]);
-                    this._log(found_items);
+                    this._log(["_processItems",found_items]);
                     var me = this;
                     var counts = {};
                     var today = new Date();
@@ -301,15 +337,17 @@
                     var max_count = 0;
                     var max_age = 0;
                    
+                    this._log( "Original: " + this.original_oids.length);
                     for ( var day in found_items ) {
-                        if ( found_items.hasOwnProperty(day) ) {
+                        if ( found_items.hasOwnProperty(day) ) {                
                             var age_total = 0;
                             var items = found_items[day];
-                            me._log(items);
+                            me._log("On day " + day + " found " + items.length + " items");
                             Ext.Array.each( items, function(item){
                                 var creation_date = Rally.util.DateTime.fromIsoString(item.get('CreationDate'));
                                 var iso_day = Rally.util.DateTime.fromIsoString(day);
                                 age_total += Rally.util.DateTime.getDifference(iso_day,creation_date,"day");
+                                
                             });
                             var age = null;
                             if ( items.length > 0 ) {
@@ -319,6 +357,7 @@
                             
                             if (items.length > max_count ) { max_count = items.length };
                             processed_data.push({ day: day, age: age, count: items.length, final_day_age: null, final_day_count: null });
+                                   
                         }
                     }
                     
