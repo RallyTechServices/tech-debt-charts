@@ -10,7 +10,7 @@
  Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    version: 0.3,
+    version: 0.4,
     items: [ 
         { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
         { xtype:'container', itemId:'chart_box', margin: 5 }
@@ -117,12 +117,14 @@
     _addExcludedProjectPicker: function() {
         this.down('#selector_box').add({
             itemId: 'excluded_projects',
-            xtype: 'rallymultiobjectpicker',
+            xtype: 'rallytsmultiprojectpicker',
             modelType: 'project',
             stateEvents: ['selectionchange','select','blur'],
             stateId: 'rally.techservices.techdebt.project',
             stateful: true,
             labelWidth: 95,
+            preselected: ["Cancelled"],
+            width: 375,
             fieldLabel: 'Excluded Projects:',
             listeners: {
                 selectionchange: function(picker, values) {
@@ -132,8 +134,9 @@
                 change: function() {
                     this._log("change");
                 },
-                select: function() {
+                select: function(picker) {
                     this._log("select");
+                    this._log(picker.getValue());
                 },
                 blur: function() {
                     this._enableButton();
@@ -143,7 +146,6 @@
         });  
     },
     _doTaggedStoryQuery: function() {
-
         var tag_name = this.down('#tags').getRecord().get('Name')
         // first, find all the items with the tag.  Use WSAPI so that we don't have
         // a permissions issue later.
