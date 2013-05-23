@@ -10,7 +10,7 @@
  Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    version: 0.4,
+    version: 0.5,
     items: [ 
         { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
         { xtype:'container', itemId:'chart_box', margin: 5 }
@@ -21,7 +21,6 @@
         this._addExcludedProjectPicker();
         this._addButton();
     },
-    _excluded_projects: [],
     _log: function(msg) {
         window.console && console.log(msg);
     },
@@ -127,19 +126,9 @@
             width: 375,
             fieldLabel: 'Excluded Projects:',
             listeners: {
-                selectionchange: function(picker, values) {
-                    this._log("selectionchange");
-                    this._excluded_projects = values;
-                },
-                change: function() {
-                    this._log("change");
-                },
-                select: function(picker) {
-                    this._log("select");
-                    this._log(picker.getValue());
-                },
-                blur: function() {
-                    this._enableButton();
+                afterrender: function(picker) {
+                    this._log('aferrender');
+                    picker.createStore();
                 },
                 scope: this
             }
@@ -265,13 +254,14 @@
     _removeExcludedProjects: function(items) {
         this._log( "_removeExcludedProjects" );
         var me = this;
-        if ( this._excluded_projects.length === 0 ) { 
+        var excluded_projects = this.down('#excluded_projects').getValue();
+        if ( excluded_projects.length === 0 ) { 
             this._log("No excluded projects");
             return items;
         }
-        this._log(["Exclude: ", this._excluded_projects ]);
+        this._log(["Exclude: ", excluded_projects ]);
         var oids = [];
-        Ext.Array.each( this._excluded_projects, function(project) {
+        Ext.Array.each(excluded_projects, function(project) {
             oids.push(project.ObjectID);
         });
         var cleaned_items = [];
@@ -303,7 +293,7 @@
     _doNestedHistoryQuery: function(oid_array,start_index,current_date,date_array,found_items) {
         this._showMask("Getting Historical Data " + current_date);
         this._log(["_doNestedHistoryQuery",start_index,current_date]);
-        var gap = 350;
+        var gap = 250;
         var sliced_array = oid_array.slice(start_index, start_index+gap);
         if ( ! found_items[current_date] ) { found_items[current_date] = []; }
         

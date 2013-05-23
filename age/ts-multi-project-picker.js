@@ -62,6 +62,20 @@ Ext.define('Rally.ts.MultiProjectPicker', {
         }
         return ordered_array;
     },
+    createStore: function() {
+        var me = this;
+        var storeCreator = Ext.create('Rally.data.DataStoreCreator', {
+            modelType: this.modelType,
+            storeConfig: this.storeConfig
+        });
+        this.mon(storeCreator, 'storecreate', function(store) {
+            me.mon(store,'load',me._reorder, me, {single: true} );
+            this.store = store;
+            this.expand();
+            this.collapse();
+        }, this, {single: true});
+        storeCreator.createStore();
+    },
     _createStoreAndExpand: function() {
         var me = this;
         var storeCreator = Ext.create('Rally.data.DataStoreCreator', {
