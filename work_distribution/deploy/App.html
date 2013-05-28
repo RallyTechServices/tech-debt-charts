@@ -19,9 +19,16 @@
              Ext.define('TagDistributionApp', {
                 extend: 'Rally.app.App',
                 componentCls: 'app',
-                version: 0.2,
+                version: 0.3,
                 items: [ 
-                    { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
+                    { xtype: 'container', layout: { type:'hbox' }, items: [
+                        { xtype:'container', 
+                            itemId:'selector_box', 
+                            layout: { type:'hbox' }, 
+                            padding: 5, margin: 5, 
+                            defaults: { padding: 5 } }, 
+                         { xtype:'container', itemId:'button_box', padding: 5, margin: 5 }
+                    ]},
                     { xtype:'container', itemId:'chart_box', margin: 5 }
                 ],
                 launch: function() {
@@ -95,6 +102,7 @@
                     this._addTagPicker();
                     this._addZoomPicker();
                     this._addFieldPicker();
+                    this._addButton();
                 },
                 _addTagPicker: function() {
                     this.down('#selector_box').add({
@@ -115,15 +123,15 @@
                         listeners: {
                             select: function(picker,values){
                                 this._log("tags.select");
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             ready: function(picker) {
                                 this._log("tags.ready");
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             staterestore: function(picker) {
                                 this._log("tags.staterestore");
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             scope: this
                         }
@@ -152,15 +160,15 @@
                         listeners: {
                             select: function(picker,values){
                                 this._log("zoom.select");
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             change: function(picker) {
                                 this._log("zoom.change");
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             staterestore: function(picker) {
                                 this._log("zoom.staterestore");
-                                this._doTaggedStoryQuery();
+                                this._enableButton();
                             },
                             scope: this
                         }
@@ -205,19 +213,19 @@
                                 listeners: {
                                     select: function(picker,values){
                                         me._log("measure.select");
-                                        me._doTaggedStoryQuery();
+                                        me._enableButton();
                                     },
                                     change: function(picker) {
                                         me._log("measure.change");
-                                        me._doTaggedStoryQuery();
+                                        me._enableButton();
                                     },
                                     staterestore: function(picker) {
                                         me._log("measure.staterestore");
-                                        me._doTaggedStoryQuery();
+                                        me._enableButton();
                                     },
                                     show: function(picker) {
                                         this._log("measure.show");
-                                        this._doTaggedStoryQuery();
+                                        this._enableButton();
                                     }
                                 }
                             });
@@ -225,21 +233,39 @@
                     })
             
                 },
+                _addButton: function() {
+                    var me = this;
+                    this.down('#button_box').add({
+                        itemId: 'go_button',
+                        xtype: 'rallybutton',
+                        text: 'Go',
+                        disabled: true,
+                        margin: 3,
+                        handler: function() {
+                            me._doTaggedStoryQuery();
+                        }
+                    }); 
+                    this._enableButton();
+                },
+                _enableButton: function() {
+                    // ALL THREE selectors must be chosen to proceed
+                    if ( this.down('#go_button') ) {
+                        if ( ! this.down('#tags') || ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
+                            return;
+                        }
+                        if ( ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
+                            this._log("No zoom value yet");
+                            return;
+                        }
+                        if ( ! this.down('#measure') || this.down('#measure').getSubmitValue() === null ) {
+                            this._log("No measure value yet");
+                            return;
+                        }
+                        this.down('#go_button').setDisabled(false);
+                    }
+                },
                 /* this one responds to the project scoping */
                 _doTaggedStoryQuery: function() {
-                    // ALL THREE selectors must be chosen to proceed
-                    if ( ! this.down('#tags') || this.down('#tags').getRecord() === false) {
-                        this._log("No tags value yet");
-                        return;
-                    }
-                    if ( ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
-                        this._log("No zoom value yet");
-                        return;
-                    }
-                    if ( ! this.down('#measure') || this.down('#measure').getSubmitValue() === null ) {
-                        this._log("No measure value yet");
-                        return;
-                    }
                     this._log( "------ Begin Finding Items -------" );
             
                     var tag_name = this.down('#tags').getRecord().get('Name');
@@ -428,7 +454,6 @@
                         var fields = [];
                         for ( var i in processed_data[0] ) {
                             if ( processed_data[0].hasOwnProperty(i)  ) {
-                                
                                 fields.push(i);
                             }
                         }
