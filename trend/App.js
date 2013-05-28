@@ -13,9 +13,12 @@
  Ext.define('TagTrendApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-    version: 0.1,
+    version: 0.2,
     items: [ 
-        { xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
+        { xtype:'container', layout:{type:'hbox'}, items: [
+            {xtype:'container', itemId:'selector_box', layout: { type:'hbox' }, padding: 5, margin: 5, defaults: { padding: 5 } }, 
+            {xtype:'container',itemId:'button_box', margin: 5, padding: 5 }
+        ]},
         { xtype:'container', itemId:'chart_box', margin: 5 }
     ],
     launch: function() {
@@ -38,6 +41,7 @@
         this._addTagPicker();
         this._addZoomPicker();
         this._addFieldPicker();
+        this._addButton();
     },
     _addTagPicker: function() {
         this.down('#selector_box').add({
@@ -58,15 +62,15 @@
             listeners: {
                 select: function(picker,values){
                     this._log("tags.select");
-                    this._doTaggedStoryQuery();
+                    this._enableButton();
                 },
                 ready: function(picker) {
                     this._log("tags.ready");
-                    this._doTaggedStoryQuery();
+                    this._enableButton();
                 },
                 staterestore: function(picker) {
                     this._log("tags.staterestore");
-                    this._doTaggedStoryQuery();
+                    this._enableButton();
                 },
                 scope: this
             }
@@ -95,15 +99,46 @@
             listeners: {
                 change: function(picker) {
                     this._log("zoom.change");
-                    this._doTaggedStoryQuery();
+                    this._enableButton();
                 },
                 staterestore: function(picker) {
                     this._log("zoom.staterestore");
-                    this._doTaggedStoryQuery();
+                    this._enableButton();
                 },
                 scope: this
             }
         });
+    },
+    _addButton: function() {
+        var me = this;
+        this.down('#button_box').add({
+            itemId: 'go_button',
+            xtype: 'rallybutton',
+            text: 'Go',
+            disabled: true,
+            margin: 3,
+            handler: function() {
+                me._doTaggedStoryQuery();
+            }
+        }); 
+        this._enableButton();
+    },
+    _enableButton: function() {
+        // ALL THREE selectors must be chosen to proceed
+        if ( this.down('#go_button') ) {
+            if ( ! this.down('#tags') || ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
+                return;
+            }
+            if ( ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
+                this._log("No zoom value yet");
+                return;
+            }
+            if ( ! this.down('#measure') || this.down('#measure').getSubmitValue() === null ) {
+                this._log("No measure value yet");
+                return;
+            }
+            this.down('#go_button').setDisabled(false);
+        }
     },
     _addFieldPicker: function() {
         var me = this;
@@ -144,15 +179,15 @@
                     listeners: {
                         change: function(picker) {
                             me._log("measure.change");
-                            me._doTaggedStoryQuery();
+                            me._enableButton();
                         },
                         staterestore: function(picker) {
                             me._log("measure.staterestore");
-                            me._doTaggedStoryQuery();
+                            me._enableButton();
                         },
                         show: function(picker) {
                             this._log("measure.show");
-                            this._doTaggedStoryQuery();
+                            this._enableButton();
                         }
                     }
                 });
@@ -164,19 +199,6 @@
      * we have to get the items through wsapi first to prevent permissions issue when hitting lookback
      */
     _doTaggedStoryQuery: function() {
-        // ALL THREE selectors must be chosen to proceed
-        if ( ! this.down('#tags') || this.down('#tags').getRecord() === false) {
-            this._log("No tags value yet");
-            return;
-        }
-        if ( ! this.down('#zoom') || this.down('#zoom').getValue() === null) {
-            this._log("No zoom value yet");
-            return;
-        }
-        if ( ! this.down('#measure') || this.down('#measure').getSubmitValue() === null ) {
-            this._log("No measure value yet");
-            return;
-        }
         this._log( "------ Begin Finding Items -------" );
         this._artifact_hash = {};
         var tag_name = this.down('#tags').getRecord().get('Name');
