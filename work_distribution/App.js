@@ -462,22 +462,28 @@
             });
             
             if ( this.chart ) { this.chart.destroy(); }
-            this.chart = Ext.create('Rally.ui.chart.Chart',{
-                height: 400,
-                series: me._getSeries(processed_data[ processed_data.length - 1 ]),
-                store: store,
-                chartConfig: {
-                    chart: { zoomType: 'xy' },
-                    title: { text: "Resolved Items by Team" },
-                    plotOptions:{ area: { stacking: "normal" } },
-                    yAxis: [ 
-                        { title: { text: me.down('#measure').getValue() }, min: 0 }
-                    ],
-                    xAxis: { 
-                        categories: me._getCategories(processed_data,'day')
+            
+            var series = this._getSeries(processed_data[ processed_data.length - 1 ]);
+            if ( series.length === 0 ) {
+                this.chart = Ext.create('Ext.container.Container',{ padding: 25, html: 'No data found' });
+            } else {
+                this.chart = Ext.create('Rally.ui.chart.Chart',{
+                    height: 400,
+                    series: series,
+                    store: store,
+                    chartConfig: {
+                        chart: { zoomType: 'xy' },
+                        title: { text: "Resolved Items by Team" },
+                        plotOptions:{ area: { stacking: "normal" } },
+                        yAxis: [ 
+                            { title: { text: me.down('#measure').getValue() }, min: 0 }
+                        ],
+                        xAxis: { 
+                            categories: me._getCategories(processed_data,'day')
+                        }
                     }
-                }
-            });
+                });
+            }
             this.down('#chart_box').add(this.chart);
         }
     },
